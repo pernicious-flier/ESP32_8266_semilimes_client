@@ -1,0 +1,10 @@
+semilimes	KEYWORD1
+SendTextMessage KEYWORD2
+SendSelectOptions	KEYWORD2
+SendLocation	KEYWORD2
+SendHTML	KEYWORD2
+PickDate	KEYWORD2
+PickTime	KEYWORD2
+PickLocation	KEYWORD2
+SendJSON	KEYWORD2
+SendRestfulMessageRequest	KEYWORD2
