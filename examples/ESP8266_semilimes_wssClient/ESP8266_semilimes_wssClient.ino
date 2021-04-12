@@ -1,7 +1,7 @@
 /*
-	semilimes mesh library
+  semilimes mesh library
 
-	This sketch:
+  This sketch:
         1. Connects to a WiFi network
         2. Connects to a Websockets server (using WSS)
         3. Enable the callbacks on event and messages 
@@ -20,8 +20,8 @@
         In orter to use it you need to install the semilimes app on your smartphone,
         create a channel and save the "Auth Token" and "Channel Id". 
 
-	Hardware:
-        For this sketch you only need an ESP32 board.
+  Hardware:
+        For this sketch you only need an ESP8266 board.
 
   used libraries:  
   ArduinoWebsockets - https://github.com/gilmaimon/ArduinoWebsockets
@@ -29,25 +29,26 @@
   Arduino_JSON - Arduino official lib
   semilimes - https://github.com/pernicious-flier/ESP32_semilimes_Client
   
-	Created 09/04/2021
+  Created 09/04/2021
   By Flavio Ansovini  https://github.com/pernicious-flier/
 */
 
 #include <ArduinoWebsockets.h>
-#include <WiFi.h>
+#include <ESP8266WiFi.h>
 #include <semilimes.h>
 #include <Arduino_JSON.h>
 
-const char* ssid = ".............."; //Enter SSID
-const char* password = "............."; //Enter Password
-String AuthToken = "..........................."; //Enter the Authorization Token
-String ReceiverID = "............................"; //Enter the channel ID
-   
+const char* ssid = "ssid"; //Enter SSID
+const char* password = "password"; //Enter Password
+String AuthToken = ".....................";
+String ReceiverID = "....................."; //the channel ID
+ 
 const char* websockets_URL = semilimes_wss_server;
   
 using namespace websockets;
-semilimes semilimes;
+
 WebsocketsClient client;
+semilimes semilimes;
 
 void JSON_decode(String payload)
 {
@@ -99,13 +100,13 @@ void onEventsCallback(WebsocketsEvent event, String data) {
     }
 }
 
-void setup() {
+void setup() {    
     Serial.begin(115200);
     // Connect to wifi
     WiFi.begin(ssid, password);
 
     // Wait some time to connect to wifi
-    for(int i = 0; i < 10 && WiFi.status() != WL_CONNECTED; i++) {
+    while(WiFi.status() != WL_CONNECTED) {
         Serial.print(".");
         delay(1000);
     }
@@ -118,11 +119,11 @@ void setup() {
     
     // Connect to server
     client.connect(websockets_URL);
-
-    String Body = "This message from ESP32 using the wss Semilimes libs";
+    
+    String Body = "This message from ESP8266 using the wss Semilimes libs";
     client.send(semilimes.SendTxtMsg(AuthToken, ReceiverID, semilimes_channel, Body));
     
-    Body = "Select Options from ESP32 using the wss Semilimes libs";
+    Body = "Select Options from ESP8266 using the wss semilimes libs";
     String OptionTexts[3];
     String OptionValues[3];
     OptionTexts[0] = "option 0";
@@ -133,7 +134,7 @@ void setup() {
     OptionValues[2] = "300";
     client.send(semilimes.SendSelectOpt(AuthToken, ReceiverID, semilimes_channel, Body, OptionTexts, OptionValues, 3));
     
-    Body = "This Location from ESP32 using the wss Semilimes libs";
+    Body = "This Location from ESP8266 using the wss Semilimes libs";
     String latitude = "10.8169596";
     String longitude = "106.6837259";
     client.send(semilimes.SendLocation(AuthToken, ReceiverID, semilimes_channel, Body, latitude, longitude));
@@ -146,15 +147,15 @@ void setup() {
     </html>";
     client.send(semilimes.SendHTML(AuthToken, ReceiverID, semilimes_channel, Body));
     
-     Body = "Pick a Date";
-     client.send(semilimes.ReceiveDate(AuthToken, ReceiverID, semilimes_channel, Body));
+    Body = "Pick a Date";
+    client.send(semilimes.ReceiveDate(AuthToken, ReceiverID, semilimes_channel, Body));
     
-     Body = "Pick a Time";
-     client.send(semilimes.ReceiveTime(AuthToken, ReceiverID, semilimes_channel, Body));
-     
-     Body = "Pick a Location";
-     client.send(semilimes.ReceiveLocation(AuthToken, ReceiverID, semilimes_channel, Body));
-
+    Body = "Pick a Time";
+    client.send(semilimes.ReceiveTime(AuthToken, ReceiverID, semilimes_channel, Body));
+    
+    Body = "Pick a Location";
+    client.send(semilimes.ReceiveLocation(AuthToken, ReceiverID, semilimes_channel, Body));
+    
      String TypeID = "38199F47-504C-4C73-97E5-8076C8CFAA21";  //send HTML
      Body = "<html> \
     <body> \

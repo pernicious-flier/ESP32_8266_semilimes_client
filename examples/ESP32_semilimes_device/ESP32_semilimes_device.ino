@@ -5,29 +5,22 @@
         1. Connects to a WiFi network
         2. Connects to a Websockets server (using WSS)
         3. Enable the callbacks on event and messages 
-        4. Sends the semilimes channel a "text" msg form
-        5. Sends the semilimes channel a "select option" msg form
-        6. Sends the semilimes channel a "geographic location" msg form
-        7. Sends the semilimes channel an "HTML" msg form
-        8. Sends the semilimes channel a "Picka date" msg form
-        9. Sends the semilimes channel a "Picka time" msg form
-        10. Sends the semilimes channel a "Picka location" msg form
-        11. Sends the semilimes channel a plain "JSON" msg form
-        12. Wait for a callback and in the case of "onMessageCallback" will 
-            decode ther JSON and print to terminal some properties
+        4. Create a new device called "ESP Lamp" with 1 output(the blue led onboard) and 2 input (the status of the LED and the status of the "FLASH" button)
+        5. Whait for a msg and eventually set/reset the LED or reply with one of the two status
 
     NOTE:
         In orter to use it you need to install the semilimes app on your smartphone,
         create a channel and save the "Auth Token" and "Channel Id". 
 
 	Hardware:
-        For this sketch you only need an ESP32 board.
+        For this sketch you only need an ESP32 board. On the ESP32 Dev module, the blue LED is connected to D0 and the Flash BTN to D3
 
   used libraries:  
   ArduinoWebsockets - https://github.com/gilmaimon/ArduinoWebsockets
   WiFi - Arduino official lib
   Arduino_JSON - Arduino official lib
   semilimes - https://github.com/pernicious-flier/ESP32_semilimes_Client
+  semilimes_device - https://github.com/pernicious-flier/ESP32_semilimes_Client
   
 	Created 09/04/2021
   By Flavio Ansovini  https://github.com/pernicious-flier/
@@ -36,23 +29,65 @@
 #include <ArduinoWebsockets.h>
 #include <WiFi.h>
 #include <semilimes.h>
+#include <semilimes_device.h>
 #include <Arduino_JSON.h>
 
-const char* ssid = ".............."; //Enter SSID
-const char* password = "............."; //Enter Password
-String AuthToken = "..........................."; //Enter the Authorization Token
-String ReceiverID = "............................"; //Enter the channel ID
-   
+const char* ssid = "ssid"; //Enter SSID
+const char* password = "password"; //Enter Password
+String AuthToken = ".....................";
+String ReceiverID = "....................."; //the channel ID
+
 const char* websockets_URL = semilimes_wss_server;
   
 using namespace websockets;
 semilimes semilimes;
 WebsocketsClient client;
 
+#define LED 2
+#define BTN 0
+
+void Led_EN(bool en)
+{
+    digitalWrite(LED, en);  
+}
+
+class digital : public semilimes_device
+{
+  public:
+  virtual int SetOutSpecific(int output_n,int value)
+  {
+    dev_outputs[output_n]=value;
+    if (output_n==1) 
+    {
+      if(value) Led_EN(HIGH);
+      else Led_EN(LOW);
+    }
+    Serial.println("name: "+dev_name+" id:"+dev_id+" group:"+dev_group+" subg:"+dev_subgroup+" OutN:"+output_n+" value:"+dev_outputs[output_n]);
+    return value;
+  }
+  virtual int GetInSpecific(int input_n)
+  {   
+    if (input_n==1) 
+    {
+      dev_inputs[input_n] = dev_outputs[1];
+    }
+    else if (input_n==2) 
+    {
+      dev_inputs[input_n] = !digitalRead(BTN);
+    }
+    Serial.println("name: "+dev_name+" id:"+dev_id+" group:"+dev_group+" subg:"+dev_subgroup+" InN:"+input_n+" value:"+dev_inputs[input_n]);
+    return dev_inputs[input_n];
+  }
+};
+
+digital Lamp;
+
 void JSON_decode(String payload)
 {
   JSONVar myObject = JSON.parse(payload);
   
+  //Serial.println(payload); //print the whole JSON to terminal, just for debug
+  /*
   // JSON.typeof(jsonVar) can be used to get the type of the var
   if (JSON.typeof(myObject) == "undefined") {
     Serial.println("Parsing input failed!");
@@ -78,13 +113,22 @@ void JSON_decode(String payload)
   if (myObject.hasOwnProperty("Body")) {
     Serial.print("myObject[\"Body\"] = ");
     Serial.println(myObject["Body"]);
+  }*/
+  if (myObject.hasOwnProperty("ConversationID") && (JSON.stringify(myObject["ConversationID"])=='"'+ReceiverID+'"')) {
+    //String msg = JSON.stringify(myObject["FormReference"]); //the "reference" string of a "Button Form" 
+    String msg = JSON.stringify(myObject["Body"]);  //the "Option value" of the "Single choice Form"
+    //remove the quotation marks
+    msg.remove(0,1);
+    msg.remove(msg.length()-1,1);
+    Serial.println(msg);
+    client.send(Lamp.parse_msg(msg,ReceiverID));
   }
 }
 
 void onMessageCallback(WebsocketsMessage message) {
-    Serial.print("Got Message: ");
-    Serial.println(message.data());
     JSON_decode(message.data());
+    //Serial.print("Got Message: ");
+    //Serial.println(message.data());
 }
 
 void onEventsCallback(WebsocketsEvent event, String data) {
@@ -99,7 +143,13 @@ void onEventsCallback(WebsocketsEvent event, String data) {
     }
 }
 
+
 void setup() {
+ 
+    pinMode(LED, OUTPUT);     // LED pin as output.
+    Led_EN(LOW);
+    pinMode(BTN, INPUT_PULLUP);  // Flash BTN as input
+    
     Serial.begin(115200);
     // Connect to wifi
     WiFi.begin(ssid, password);
@@ -122,47 +172,7 @@ void setup() {
     String Body = "This message from ESP32 using the wss Semilimes libs";
     client.send(semilimes.SendTxtMsg(AuthToken, ReceiverID, semilimes_channel, Body));
     
-    Body = "Select Options from ESP32 using the wss Semilimes libs";
-    String OptionTexts[3];
-    String OptionValues[3];
-    OptionTexts[0] = "option 0";
-    OptionTexts[1] = "option 1";
-    OptionTexts[2] = "option 2";
-    OptionValues[0] = "100";
-    OptionValues[1] = "200";
-    OptionValues[2] = "300";
-    client.send(semilimes.SendSelectOpt(AuthToken, ReceiverID, semilimes_channel, Body, OptionTexts, OptionValues, 3));
-    
-    Body = "This Location from ESP32 using the wss Semilimes libs";
-    String latitude = "10.8169596";
-    String longitude = "106.6837259";
-    client.send(semilimes.SendLocation(AuthToken, ReceiverID, semilimes_channel, Body, latitude, longitude));
-    
-    Body = "<html> \
-    <body> \
-    <h1>My First Heading</h1> \
-    <p>My first paragraph.</p> \
-    </body> \
-    </html>";
-    client.send(semilimes.SendHTML(AuthToken, ReceiverID, semilimes_channel, Body));
-    
-     Body = "Pick a Date";
-     client.send(semilimes.ReceiveDate(AuthToken, ReceiverID, semilimes_channel, Body));
-    
-     Body = "Pick a Time";
-     client.send(semilimes.ReceiveTime(AuthToken, ReceiverID, semilimes_channel, Body));
-     
-     Body = "Pick a Location";
-     client.send(semilimes.ReceiveLocation(AuthToken, ReceiverID, semilimes_channel, Body));
-
-     String TypeID = "38199F47-504C-4C73-97E5-8076C8CFAA21";  //send HTML
-     Body = "<html> \
-    <body> \
-    <h1>My First json Heading</h1> \
-    <p>My first json paragraph.</p> \
-    </body> \
-    </html>";
-    client.send(semilimes.SendJSON(AuthToken, ReceiverID, semilimes_channel, TypeID, Body));
+    Lamp.init(AuthToken, "ESP Lamp",1,1,1,1,2); // AuthToken, name of the device, id, group, subgroup, number of outputs, number of inputs
 }
 
 void loop() {

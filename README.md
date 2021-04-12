@@ -1,6 +1,6 @@
 
-# semilimes client- Arduino library for ESP32
-[![Platform](https://img.shields.io/badge/platform-Arduino--IDE-red)](https://nodered.org)   [![Downloads](https://img.shields.io/badge/download-github-purple)](https://github.com/pernicious-flier/Arduino-semilimes-connector) [![arduino-library-badge](https://www.ardu-badge.com/badge/semilimes_connector.svg?)](https://www.ardu-badge.com/semilimes_connector)  [![Device](https://img.shields.io/badge/Device-ESP32-blue)](https://www.espressif.com/en/products/socs/esp32) [![License](https://img.shields.io/badge/license-GPLv3-yellow)](https://www.gnu.org/licenses/gpl-3.0.html)
+# semilimes client - Arduino library for ESP32 and ESP8266
+[![Platform](https://img.shields.io/badge/platform-Arduino--IDE-red)](https://nodered.org)   [![Downloads](https://img.shields.io/badge/download-github-purple)](https://github.com/pernicious-flier/Arduino-semilimes-connector) [![arduino-library-badge](https://www.ardu-badge.com/badge/semilimes_connector.svg?)](https://www.ardu-badge.com/semilimes_connector)  [![Device](https://img.shields.io/badge/Device-ESP32-blue)](https://www.espressif.com/en/products/socs/esp32)  [![Device](https://img.shields.io/badge/Device-ESP8266-green)](https://www.espressif.com/en/products/socs/esp8266) [![License](https://img.shields.io/badge/license-GPLv3-yellow)](https://www.gnu.org/licenses/gpl-3.0.html)
 
 This library contains some helper functions that implements the semilimes api. It has to be used as a  connector to a specific semilimes channel. The only thing required is the `token` and the `Channel ID` that can be retrieved by the semilimes app.
 
@@ -11,28 +11,68 @@ This library contains some helper functions that implements the semilimes api. I
 
 # Installation of the Arduino IDE library
 
-To install the library explode the zip file "ESP32_semilimes_client-master.zip" inside of the "Arduino/library" folder and rename the folder as "ESP32_semilimes_client". Once the Arduino IDE is running, you could start to work from the example projects:
-	- ESP32_semilimes_restfulClient
+To install the library explode the zip file "ESP32_8266_semilimes_client-master.zip" inside of the "Arduino/library" folder and rename the folder as "ESP32_8266_semilimes_client". Once the Arduino IDE is running, you could start to work from the example projects:
 	- ESP32_semilimes_wssClient
+	- ESP32_semilimes_wssClient_NmsgsReceive
+	- ESP32_semilimes_device
+	- ESP8266_semilimes_wssClient
+	- ESP8266_semilimes_wssClient_NmsgsReceive
+	- ESP8266_semilimes_device
 # Dependencies
-The library doesn't have any dependencies. In order to use the semilimes library and communicate to the messenger, you will need to send resful command or connect to the semilimes websocket. To do that, the example projects use the following libraries:
-	- [ESP32 WiFi](https://github.com/espressif/arduino-esp32/blob/master/libraries/WiFi/src/WiFi.h)
-	- [ArduinoWebsockets](https://github.com/gilmaimon/ArduinoWebsockets)
-	- [Arduino_JSON](https://github.com/arduino-libraries/Arduino_JSON)
+The library doesn't have any dependency. In order to use the semilimes library and communicate to the messenger, you will need to connect to the semilimes websocket. To do that, the example projects use the following additional libraries:
+ESP32:
+  ArduinoWebsockets - https://github.com/gilmaimon/ArduinoWebsockets
+  WiFi - Arduino official lib
+  Arduino_JSON - Arduino official lib
+ESP8266:
+  ArduinoWebsockets - https://github.com/gilmaimon/ArduinoWebsockets
+  WiFi - Arduino official lib
+  Arduino_JSON - Arduino official lib
+
 # Usage
 ### Basics
-The semilimes-connector library implement the semilimes api in order to communicate to the messenger mobile app. There are two ways to communicate, via restful commands (HTTP POST) or via a WebSocket connection. The restful command are light weight, you just need to POST an HTTP message , but the commands available are more limited. The WebSocket connection is more powerful and it can be used to send several types of messages.
+In the package you find two library, one is called "semilimes" and the other "semilimes_device".
+The "semilimes" library implement the semilimes api in order to communicate to the messenger mobile app. There are two ways to communicate to the semilimes server, via restful commands (HTTP POST) or via a WebSocket connection. The restful command are light weight, you just need to POST an HTTP message, but the commands available are limited. The WebSocket connection is more powerful, it can be used to send several types of messages and it's the one that the libraries uses. With this library you have several functions on witch you can send and receive several form messages to the messanger app.
 
-### Types of semilimes messages (websocket connection)
+The "semilimes_device" library implement a device structure and a simple "machine to machine" protocol. Create a "channel" is useful to have a communication bus for humans and machines. On a channel, every member should have the right to read and write, and every communication is in broadcast. In orter to send a message to specific device, or a group of devices, a protocol that every member could understand is needed. The "semilimes_device" library is ment to address this problem in an easy way. It creates the structure of a common device with a "friendly Name", ID and It will belongs to a group and a subgroup. Every device could have a number of input and output  (from 0 to 9) and every I/O have a dedicated functions to set or get the I/O. All this parameters could be set using the "init" function.
+In order to set/get the I/O or retreive other info about the device, a simple protocol is defined. Sending from the channel the message "#h", the device with id==1 will reply with the following help page:
+#### semilimes machine2machine protocol
+##### message structure
+    start direction n(name). i(id). g(group). s(subg). p(port). v(val)
+##### parameters
+	start: start char = #
+	dir: direction, < (from messanger to device) , > (from device to messanger)
+	name: device name(String)
+	id: device ID (int)
+	group: device group (int 1..9)
+	subg: device sub group (int 1..9)
+	port: device I/O port number (int 1..9)
+	val: output value(int)
+##### info
+	You don't have to use all parameters, just what you need.
+	If you set "i", "g" or "s" to '0', you are selecting all ip, all group, all subgroup
+	If you dont't set i, g, s in the msg, are set to '0' by default
+##### Examples
+	sample message to set "1" to Port1 digital output, of the device called "Device1", id=1, group=1, subgroup=1:
+	# > nDevice1.i1.g1.s1.p1.v1.
+	sample message to get a digital input Port1, from a device with id=1, group=2, subgroup=3:
+	# < i1.g2.s3.p1.
+	sample message to get inputs from all devs in group 1 port 1:
+	# < g1.p1.
+	message to get this guide: 
+	#h
+	
+## "semilimes" library functions
+### Types of semilimes messages
 
 The following message contents can be sent and received 
 - **SendTextMessage** - content is text
 - **SendSelectOptions** - content is a title followed by buttons to make a choice
 - **SendLocation** - content is an object with latitude and longitude
 - **SendHTML** - content is an object that embed an HTML script
-- **PickLocation** - content is an object that enable the user to choose a location
-- **PickDate** - content is an object that enable the user to choose a Date
-- **PickTime** - content is an object that enable the user to choose a Time
+- **ReceiveLocation** - content is an object that enable the user to choose a location
+- **ReceiveDate** - content is an object that enable the user to choose a Date
+- **ReceiveTime** - content is an object that enable the user to choose a Time
 - **SendJSON** - content is a JSON and depends on the msg type (check the semilimes API)
 
 
@@ -40,10 +80,11 @@ The following message contents can be sent and received
 #### SendTextMessage function
 The *SendTextMessage()* functionsend a text messages to a specified channel. To be able to work it should be configured with the Token and the Receiver ID (the ID of the channel):
 
-	String semilimes::SendTextMessage(String AuthToken, String ReceiverID, String Body);
+	String semilimes::SendTxtMsg(String AuthToken, String ReceiverID, int dest_type, String Body);
 
 	AuthToken: the authentication token related to your semilimes account
-	ReceiverID: this is the channelID where you want to send the message
+	ReceiverID: this is the channelID or UserID where you want to send the message
+	dest_type: this is to specify if the message is for a User or a Channel (can be "semilimes_user" or "semilimes_channel")
 	Body: is the body of the message
 
 #### SendSelectOptions function
@@ -52,7 +93,8 @@ The *SendSelectOptions()* function is used to send a choice to the selected chan
 	String semilimes::SendSelectOptions(String AuthToken, String ReceiverID, String Body, String* OptionTexts, String* OptionValues, int OptionsNumber);
 	
 	AuthToken: the authentication token related to your semilimes account
-	ReceiverID: this is the channelID where you want to send the message
+	ReceiverID: this is the UserID or a ChannelID where you want to send the message
+	dest_type: this is to specify if the message is for a User or a Channel (can be "semilimes_user" or "semilimes_channel")
 	Body: is the title of the message
 	OptionsTexts: is a pointer to the array of the Options name
 	OptionsValue: is a pointer to the array of the Options value
@@ -63,10 +105,11 @@ The *SendSelectOptions()* function is used to send a choice to the selected chan
 The *SendLocation* node is used to send a location to the selected channel, it will be displayed as a marker on a map.
 
 
-	String semilimes::SendLocation(String AuthToken, String ReceiverID, String Body, String latitude, String longitude);
+	String semilimes::SendLocation(String AuthToken, String ReceiverID, int dest_type, String Body, String latitude, String longitude);
 	
 	AuthToken: the authentication token related to your semilimes account
-	ReceiverID: this is the channelID where you want to send the message
+	ReceiverID: this is the UserID or a ChannelID where you want to send the message
+	dest_type: this is to specify if the message is for a User or a Channel (can be "semilimes_user" or "semilimes_channel")
 	Body: is the title of the message
 	latitude: is the latitude of the location
 	longitude: is the longitude of the location
@@ -74,37 +117,41 @@ The *SendLocation* node is used to send a location to the selected channel, it w
 #### SendHTML function
 The *SendHTML* function is used to embed and send an HTML script within a message, the HTML will be rendered in the channel. 
 
-	String semilimes::SendHTML(String AuthToken, String ReceiverID, String Body);
+	String semilimes::SendHTML(String AuthToken, String ReceiverID, int dest_type, String Body);
 	
 	AuthToken: the authentication token related to your semilimes account
-	ReceiverID: this is the channelID where you want to send the message
+	ReceiverID: this is the UserID or a ChannelID where you want to send the message
+	dest_type: this is to specify if the message is for a User or a Channel (can be "semilimes_user" or "semilimes_channel")
 	Body: is the HTML script
 
-#### PickLocation function
-The *PickLocation* function is meant to permit the user to choose a location on the map. Sending this message on a selected channel, a map will be shown and a user could pick a place on the map and send it back to the client. 
+#### ReceiveLocation function
+The *ReceiveLocation* function is meant to permit the user to choose a location on the map. Sending this message on a selected channel, a map will be shown and a user could pick a place on the map and send it back to the client. 
 
-	String semilimes::PickLocation(String AuthToken, String ReceiverID, String Body);
+	String semilimes::PickLocation(String AuthToken, String ReceiverID, int dest_type, String Body);
 	
 	AuthToken: the authentication token related to your semilimes account
-	ReceiverID: this is the channelID where you want to send the message
+	ReceiverID: this is the UserID or a ChannelID where you want to send the message
+	dest_type: this is to specify if the message is for a User or a Channel (can be "semilimes_user" or "semilimes_channel")
 	Body: is the title of the message
 
-#### PickDate function
-The *PickDate* function is meant to permit the user to choose a Date on the calendar. Sending this message on a selected channel, a calendar will be shown and a user could pick a date and send it back to the client. 
+#### ReceiveDate function
+The *ReceiveDate* function is meant to permit the user to choose a Date on the calendar. Sending this message on a selected channel, a calendar will be shown and a user could pick a date and send it back to the client. 
 
-	String semilimes::PickDate(String AuthToken, String ReceiverID, String Body);
+	String semilimes::PickDate(String AuthToken, String ReceiverID, int dest_type, String Body);
 	
 	AuthToken: the authentication token related to your semilimes account
-	ReceiverID: this is the channelID where you want to send the message
+	ReceiverID: this is the UserID or a ChannelID where you want to send the message
+	dest_type: this is to specify if the message is for a User or a Channel (can be "semilimes_user" or "semilimes_channel")
 	Body: is the title of the message
 
-#### PickTime function
-The *PickTime* function is meant to permit the user to choose a time. Sending this message on a selected channel, a clock will be shown and a user could choose a time and send it back to the client. 
+#### ReceiveTime function
+The *ReceiveTime* function is meant to permit the user to choose a time. Sending this message on a selected channel, a clock will be shown and a user could choose a time and send it back to the client. 
 
-	String semilimes::PickTime(String AuthToken, String ReceiverID, String Body);
+	String semilimes::PickTime(String AuthToken, String ReceiverID, int dest_type, String Body);
 	
 	AuthToken: the authentication token related to your semilimes account
-	ReceiverID: this is the channelID where you want to send the message
+	ReceiverID: this is the UserID or a ChannelID where you want to send the message
+	dest_type: this is to specify if the message is for a User or a Channel (can be "semilimes_user" or "semilimes_channel")
 	Body: is the title of the message
 
 In order to use the node it is necessary to feed it with a string which will be the text part of the message. 
@@ -112,32 +159,70 @@ In order to use the node it is necessary to feed it with a string which will be 
 #### SendJSON function
 The *SendJSON* function is ment to be used to connect to the server sending the whole JSON message. To use this node you have to check the semilimes API for the syntax and the message type that could be sent.
 
-	String semilimes::SendJSON(String AuthToken, String ReceiverID, String TypeID, String Body);
+	String semilimes::SendJSON(String AuthToken, String ReceiverID, int dest_type, String TypeID, String Body);
 	
 	AuthToken: the authentication token related to your semilimes account
-	ReceiverID: this is the channelID where you want to send the message
+	ReceiverID: this is the UserID or a ChannelID where you want to send the message
+	dest_type: this is to specify if the message is for a User or a Channel (can be "semilimes_user" or "semilimes_channel")
 	Body: is the JSON script
 	
 This function could be used to send any kind of message supported by the API. The example project shiws how to sends an HTML script embedded into the JSON. 
 
-### Types of restful semilimes messages
-- **SendRestfulMessageRequest** - content is text
+#### SendRestMsgReq function
+The *SendRestMsgReq* function is ment to be used if you what to receive the last n messages from the server. It's possible to send the message again and again, adding the timestamp of the last received message. In this way it's possible to retrieve any number of old messages, "n" messages at a time.
 
-#### SendRestfulMessageRequest function
-The *SendJSON* function is ment to be used to connect to the server sending the whole JSON message. To use this node you have to check the semilimes API for the syntax and the message type that could be sent.
-
-	String semilimes::SendRestfulMessageRequest(String token, String ReceiverId, String msg);
+	String semilimes::SendRestMsgReq(String token, String ReceiverID, int dest_type, String msg);
 	
 	AuthToken: the authentication token related to your semilimes account
-	ReceiverID: this is the channelID where you want to send the message
+	ReceiverID: this is the UserID or a ChannelID where you want to send the message
+	dest_type: this is to specify if the message is for a User or a Channel (can be "semilimes_user" or "semilimes_channel")
 	Body: is the JSON script
 	
-This function could be used to send any kind of message supported by the API. The example project shiws how to sends an HTML script embedded into the JSON. 
+## "semilimes_library" library functions
 
-# Support 
-If you want to support this free project. Any help is welcome. You can donate by clicking one of the following link:
-<a target="blank" href="https://www.paypal.com/paypalme/flavioansovini"><img src="https://img.shields.io/badge/Donate-PayPal-blue.svg"/></a>
+#### init function
 
+    void semilimes_device::init(String AuthToken, String name,	int	id,	int group,	int subgroup, int n_out, int n_in)
+    
+	AuthToken: the authentication token related to your semilimes account
+	name: the "Friendly name" of the device
+	id: the "ID" of the device (should be unique)
+	group: the group of the device, an integer number from 1 to 9
+	subgroup: the subgroup of the device, an integer number from 1 to 9
+	n_out: the number of output present on the device (from 1 to 9)
+	n_in: the number of input present on the device (from 1 to 9)
+    
+This is the initialization function of a new device. In orther to create a new device the class "semilimes_device" should be derived and a new object should be created:
+    
+class derived_class : public semilimes_device
+{
+public:
+virtual int SetOutSpecific(int output_n,int value){.......}
+virtual int GetInSpecific(int input_n) {.......}
+};
+
+derived_class new_Object;
+
+### SetOutSpecific function
+
+    virtual int SetOutSpecific(int output_n,int value);
+    
+    output_n: the number of the output
+    value: the value to set to the output
+
+This is a redefinition of a virtual function. When the flow get here, it means that it is needed to set an output. If there are more then one output on the device, a switch() could be useful, in order to select the right output and set the "value".
+
+### GetInSpecific function
+
+    virtual int GetInSpecific(int input_n);
+    
+    input_n: the number of the input
+
+This is a redefinition of a virtual function. When the flow get here, it means that it is needed to get an input. If there are more then one input on the device, a switch() could be useful, in order to select the right input and return its status.
+
+    
+    
+    
 # License
 Author: Flavio Ansovini
 
